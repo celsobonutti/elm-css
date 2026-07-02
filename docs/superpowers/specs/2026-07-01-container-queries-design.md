@@ -1,6 +1,6 @@
 # Container Queries (`@container`) for elm-css — Design
 
-**Date:** 2026-07-01
+**Date:** 2026-07-01 (amended 2026-07-02: typed range syntax added)
 **Status:** Approved.
 **Supersedes:** `2026-06-30-container-queries-design.md` (removed; this session's
 decisions replace it in full).
@@ -10,7 +10,8 @@ decisions replace it in full).
 Add end-to-end support for CSS [container queries](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@container)
 through a new `Css.Container` module modeled on `Css.Media`, covering:
 
-1. The `@container` at-rule (typed size queries, named containers, escape hatches).
+1. The `@container` at-rule (typed size queries including range syntax, named
+   containers, escape hatches).
 2. The container establishment properties: `container-type`, `container-name`,
    and the `container` shorthand.
 3. The container query length units: `cqw`, `cqh`, `cqi`, `cqb`, `cqmin`, `cqmax`.
@@ -22,8 +23,6 @@ Out of scope (YAGNI for this pass; the escape hatches cover them):
 
 - Typed `style()` queries (`@container style(--accent: blue)`).
 - Typed `scroll-state()` queries.
-- Typed range syntax (`(400px <= width <= 700px)`). Min/max-prefixed features
-  cover the practical cases; ranges remain expressible via `rawCondition`.
 - Nested at-rule output (`@media { @container { … } }`) — see Nesting semantics.
 
 ## Architecture
@@ -57,6 +56,7 @@ feature vocabulary:
 ```elm
 type QueryCondition leaf
     = Feature leaf                        -- (min-width: 400px), (orientation: landscape)
+    | Range RangeExpression               -- (width > 400px), (200px <= width <= 700px)
     | Not (QueryCondition leaf)           -- not (…)
     | And (List (QueryCondition leaf))    -- (…) and (…)
     | Or (List (QueryCondition leaf))     -- (…) or (…)
@@ -64,7 +64,21 @@ type QueryCondition leaf
 
 type alias ContainerFeature =
     { feature : String, value : Maybe String }   -- same shape as MediaExpression
+
+{-| A range feature test. `lower`/`upper` are the optional bounds:
+gt/lt/ge/le/eq set exactly one; between sets both (inclusive, Le/Le). -}
+type alias RangeExpression =
+    { feature : String
+    , lower : Maybe ( Comparison, String )
+    , upper : Maybe ( Comparison, String )
+    }
+
+type Comparison
+    = Lt | Le | Gt | Ge | Eq
 ```
+
+`Range` is leaf-independent, so both `Css.Container` and `Css.Media` conditions
+can hold ranges.
 
 New `Declaration` variant:
 
@@ -85,6 +99,9 @@ without constructors):
 
 - `Feature f` → `(feature: value)` or `(feature)` (reuse the
   `mediaExpressionToString` logic).
+- `Range r` → single bound emits feature-first: `(width > 400px)`,
+  `(width = 400px)`; both bounds emit the chained form:
+  `(200px <= width <= 700px)`.
 - `Not c` → `not ` ++ parenthesized child.
 - `And cs` / `Or cs` → children joined with ` and ` / ` or `.
 - `Raw s` → `s` verbatim.
@@ -111,11 +128,13 @@ module Css.Container exposing
     ( Condition
     , withContainer, withContainerNamed, withContainerQuery
     , anyOf, allOf, not, rawCondition
-    , minWidth, width, maxWidth, minHeight, height, maxHeight
-    , minInlineSize, maxInlineSize, minBlockSize, blockSize, maxBlockSize
-    , minAspectRatio, aspectRatio, maxAspectRatio
+    , minWidth, maxWidth, minHeight, maxHeight
+    , minInlineSize, maxInlineSize, minBlockSize, maxBlockSize
+    , minAspectRatio, maxAspectRatio
+    , width, height, inlineSize, blockSize, aspectRatio
+    , gt, lt, ge, le, eq, between
     , orientation, Landscape, Portrait, landscape, portrait
-    , ContainerTypeValue, containerType, normal, size, inlineSize
+    , ContainerTypeValue, containerType, normal, size
     , containerName, containerNames, container
     )
 ```
@@ -157,38 +176,77 @@ All length arguments use the `AbsoluteLength compatible` constraint from
 `Css.Media`. `aspect-ratio` features reuse the `Ratio` pattern
 (`Css.Media.ratio`-style constructor, defined locally).
 
-- `minWidth`, `width`, `maxWidth`, `minHeight`, `height`, `maxHeight` — exact and
-  min/max forms, mirroring `Css.Media`.
-- `minInlineSize`, `maxInlineSize`, `minBlockSize`, `blockSize`, `maxBlockSize` —
-  logical-axis features. **There is intentionally no exact `inlineSize` feature**:
-  that name is taken by the `container-type` value below, which is written far
-  more often than an exact inline-size equality test. The gap is covered by
-  `minInlineSize`/`maxInlineSize` or `rawCondition "(inline-size: 400px)"`, and
-  the asymmetry gets a doc comment.
-- `minAspectRatio`, `aspectRatio`, `maxAspectRatio`.
-- `orientation` with local `Landscape`/`Portrait`/`landscape`/`portrait` values —
-  structurally identical to `Css.Media`'s records, so values from either module
-  work, but `Css.Container` is self-contained (no second import needed).
+**Min/max-prefixed features** return `Condition` directly, mirroring `Css.Media`:
+`minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minInlineSize`,
+`maxInlineSize`, `minBlockSize`, `maxBlockSize`, `minAspectRatio`,
+`maxAspectRatio`.
+
+**There are intentionally no exact-match plain features** (`width (px 400)` →
+`(width: 400px)`): those names belong to the range-syntax feature tokens below,
+and exact match is expressed as `width |> eq (px 400)` → `(width = 400px)`,
+which is semantically equivalent.
+
+`orientation` takes local `Landscape`/`Portrait`/`landscape`/`portrait` values —
+structurally identical to `Css.Media`'s records, so values from either module
+work, but `Css.Container` is self-contained (no second import needed).
+
+### Range syntax: feature tokens + comparisons
+
+Feature tokens are compatibility records in the classic elm-css keyword style:
+
+```elm
+width : { value : String, containerFeature : Compatible, mediaFeature : Compatible }
+-- likewise height, aspectRatio (shared with media queries);
+-- inlineSize, blockSize carry containerFeature but NOT mediaFeature
+-- (container-only features);
+-- inlineSize ALSO carries containerTypeValue — see Establishment properties.
+```
+
+Comparison builders are value-first so pipelines read feature-first:
+
+```elm
+gt, lt, ge, le, eq : Value compatible -> FeatureToken f -> Condition
+between : Value compatible -> Value compatible -> FeatureToken f -> Condition
+-- where FeatureToken f = { f | value : String, containerFeature : Compatible }
+
+withContainer [ width |> gt (px 400) ] [ … ]
+-- ⇒ @container (width > 400px) { … }
+
+withContainer [ width |> between (px 200) (px 700) ] [ … ]
+-- ⇒ @container (200px <= width <= 700px) { … }
+
+withContainer [ aspectRatio |> ge (ratio 16 9) ] [ … ]
+-- ⇒ @container (aspect-ratio >= 16/9) { … }
+```
+
+`between` is inclusive on both ends (`<=` twice). Comparison values use the
+loose `Value compatible = { compatible | value : String }` alias so lengths and
+ratios both fit; per-feature value checking (e.g. rejecting a ratio on `width`)
+is not attempted in v1.
 
 ### Establishment properties
 
 Housed in `Css.Container` so one import covers the whole feature:
 
 ```elm
-containerType : ContainerTypeValue -> Style
-normal : ContainerTypeValue        -- container-type: normal
-size : ContainerTypeValue          -- container-type: size
-inlineSize : ContainerTypeValue    -- container-type: inline-size
+containerType : ContainerTypeValue a -> Style
+normal : …    -- container-type: normal
+size : …      -- container-type: size
+-- inline-size: use the dual-role `inlineSize` token (see below)
 
 containerName : String -> Style          -- container-name: sidebar
 containerNames : List String -> Style    -- container-name: a b
 
-container : String -> ContainerTypeValue -> Style
+container : String -> ContainerTypeValue a -> Style
 -- shorthand: container "sidebar" inlineSize ⇒ container: sidebar / inline-size
 ```
 
-`ContainerTypeValue` follows the existing keyword-record pattern
-(`{ value : String, containerTypeValue : Compatible }`).
+`ContainerTypeValue a` follows the existing extensible keyword-record pattern
+(`{ a | value : String, containerTypeValue : Compatible }`). The `inlineSize`
+token carries **both** the `containerFeature` and `containerTypeValue` markers,
+so one export serves both roles: `containerType inlineSize` and
+`inlineSize |> gt (px 400)` both compile, and neither `normal`/`size` nor the
+other feature tokens cross over (they each carry only their own marker).
 
 ## `Css.Media` additive additions
 
@@ -207,7 +265,18 @@ anyOf : List Condition -> Condition
 allOf : List Condition -> Condition
 inverse : Condition -> Condition           -- `not` is taken by media-type negation
 condition : List Condition -> MediaQuery   -- top-level list joined with `and`
+
+gt, lt, ge, le, eq : Value compatible -> MediaFeatureToken f -> Condition
+between : Value compatible -> Value compatible -> MediaFeatureToken f -> Condition
+-- where MediaFeatureToken f = { f | value : String, mediaFeature : Compatible }
 ```
+
+The range comparisons reuse the feature tokens from `Css.Container` (the
+canonical token home): shared tokens (`width`, `height`, `aspectRatio`) carry
+the `mediaFeature` marker, so `Container.width |> Media.gt (px 600)` compiles,
+while container-only tokens (`inlineSize`, `blockSize`) lack it and are
+rejected by the compiler in media conditions. None of `gt`/`lt`/`ge`/`le`/
+`eq`/`between` clash with existing `Css.Media` names.
 
 ```elm
 withMedia
@@ -218,6 +287,9 @@ withMedia
     ]
     [ … ]
 -- ⇒ @media (min-width: 400px) and ((orientation: landscape) or (not (hover: hover))) { … }
+
+withMedia [ condition [ Container.width |> gt (px 600) ] ] [ … ]
+-- ⇒ @media (width > 600px) { … }
 ```
 
 Because `condition` returns a `MediaQuery`, it slots into `withMedia`'s existing
@@ -256,8 +328,11 @@ nested-rule flattening `media` does.
 New `tests/Container.elm` mirroring `tests/Media.elm`:
 
 - Each feature → expected `@container (…)` output.
+- Range comparisons: each of `gt`/`lt`/`ge`/`le`/`eq` → expected operator
+  output; `between` → chained `(a <= f <= b)` form; ranges on `aspectRatio`
+  with `ratio` values; dual-role `inlineSize` in both positions.
 - Combinator composition and nested parenthesization (`anyOf`/`allOf`/`not`,
-  including `not` directly under `anyOf`).
+  including `not` directly under `anyOf`, and ranges under combinators).
 - Named vs anonymous containers; `withContainerNamed` output.
 - `withContainerQuery` and `rawCondition` passthrough.
 - Nesting: `withContainer` inside a selector, selectors extended inside
@@ -267,7 +342,8 @@ New `tests/Container.elm` mirroring `tests/Media.elm`:
   shorthand render correctly.
 - Units: `cqw`…`cqmax` render correctly.
 - `Css.Global.container` output.
-- `Css.Media` additions: `condition`/`expr`/`anyOf`/`allOf`/`inverse` output.
+- `Css.Media` additions: `condition`/`expr`/`anyOf`/`allOf`/`inverse` output,
+  and range comparisons with shared `Css.Container` tokens.
 - Regression: existing `withMedia` output is byte-identical to before;
   class-name hashing distinguishes styles differing only in container condition.
 
@@ -276,16 +352,18 @@ Add doc-test entries for new exposed functions and add `Css.Container` to
 
 ## Implementation order
 
-1. `Css.Structure`: `QueryCondition`, `ContainerFeature`, `ContainerRule`,
-   `ConditionQuery`; compaction cases; `styleBlockToContainerRule`.
-2. `Css.Structure.Output`: `conditionToString`, `@container` emission,
-   `ConditionQuery` emission.
+1. `Css.Structure`: `QueryCondition` (incl. `Range`/`RangeExpression`/
+   `Comparison`), `ContainerFeature`, `ContainerRule`, `ConditionQuery`;
+   compaction cases; `styleBlockToContainerRule`.
+2. `Css.Structure.Output`: `conditionToString` (incl. range forms),
+   `@container` emission, `ConditionQuery` emission.
 3. `Css.Preprocess`: `WithContainer` variant + snippet declaration; handle in
    existing `case style of` sites.
 4. `Css.Preprocess.Resolve`: `resolveContainerRule`, `WithContainer` fold case,
    nesting semantics.
-5. `Css.Container`: public module (queries + properties).
-6. `Css.Media`: `Condition`/`expr`/`anyOf`/`allOf`/`inverse`/`condition`.
+5. `Css.Container`: public module (queries + tokens/comparisons + properties).
+6. `Css.Media`: `Condition`/`expr`/`anyOf`/`allOf`/`inverse`/`condition` +
+   `gt`/`lt`/`ge`/`le`/`eq`/`between`.
 7. `Css.elm`: `cqw`…`cqmax`.
 8. `Css.Global`: `container`/`containerQuery`.
 9. `elm.json` exposed-modules; tests throughout (test-first per module).
