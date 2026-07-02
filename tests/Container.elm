@@ -10,6 +10,7 @@ module Container exposing
     , containerUnits
     , globalContainer
     , globalContainerQuery
+    , globalNestedContainerCombine
     , outputConditionForms
     , outputConditionQuery
     , outputContainerRule
@@ -17,6 +18,7 @@ module Container exposing
     , resolveNestedContainer
     , resolveWithContainer
     , withContainerMediaOuterWins
+    , withContainerNamedInnerWins
     , withMediaContainerOuterWins
     )
 
@@ -217,12 +219,12 @@ containerFeatures =
 containerRanges : Test
 containerRanges =
     describe "Css.Container range comparisons"
-        [ containerFeatureTest "gt" [ ( Container.width |> gt (px 400), "(width > 400px)" ) ]
-        , containerFeatureTest "lt" [ ( Container.width |> lt (px 400), "(width < 400px)" ) ]
-        , containerFeatureTest "ge" [ ( Container.width |> ge (px 400), "(width >= 400px)" ) ]
-        , containerFeatureTest "le" [ ( Container.width |> le (px 400), "(width <= 400px)" ) ]
-        , containerFeatureTest "eq" [ ( Container.width |> eq (px 400), "(width = 400px)" ) ]
-        , containerFeatureTest "between" [ ( Container.width |> between (px 200) (px 700), "(200px <= width <= 700px)" ) ]
+        [ containerFeatureTest "gt" [ ( width |> gt (px 400), "(width > 400px)" ) ]
+        , containerFeatureTest "lt" [ ( width |> lt (px 400), "(width < 400px)" ) ]
+        , containerFeatureTest "ge" [ ( width |> ge (px 400), "(width >= 400px)" ) ]
+        , containerFeatureTest "le" [ ( width |> le (px 400), "(width <= 400px)" ) ]
+        , containerFeatureTest "eq" [ ( width |> eq (px 400), "(width = 400px)" ) ]
+        , containerFeatureTest "between" [ ( width |> between (px 200) (px 700), "(200px <= width <= 700px)" ) ]
         , containerFeatureTest "aspect-ratio ge" [ ( aspectRatio |> ge (ratio 16 9), "(aspect-ratio >= 16/9)" ) ]
         , containerFeatureTest "inlineSize as feature token" [ ( inlineSize |> gt (px 400), "(inline-size > 400px)" ) ]
         ]
@@ -325,6 +327,25 @@ globalContainerQuery =
         ]
 
 
+globalNestedContainerCombine : Test
+globalNestedContainerCombine =
+    let
+        input =
+            stylesheet
+                [ Css.Global.container [ Container.minWidth (px 400) ]
+                    [ Css.Global.container [ Container.orientation Container.landscape ]
+                        [ Css.Global.footer [ Css.maxWidth (px 300) ] ]
+                    ]
+                ]
+    in
+    describe "Css.Global.container nesting and-combines conditions"
+        [ test "and-combines conditions, dropping the (empty) outer style block" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented "@container (min-width: 400px) and (orientation: landscape){footer{max-width:300px;}}")
+        ]
+
+
 containerProperties : Test
 containerProperties =
     describe "Css.Container establishment properties"
@@ -422,6 +443,29 @@ withContainerMediaOuterWins =
             \_ ->
                 outdented (prettyPrint input)
                     |> Expect.equal (outdented "@container (min-width: 400px){p{color:#000000;}}")
+        ]
+
+
+withContainerNamedInnerWins : Test
+withContainerNamedInnerWins =
+    let
+        input =
+            stylesheet
+                [ p
+                    [ withContainerNamed "outer"
+                        [ minWidth (px 400) ]
+                        [ withContainerNamed "inner"
+                            [ maxWidth (px 700) ]
+                            [ Css.color (hex "000000") ]
+                        ]
+                    ]
+                ]
+    in
+    describe "withContainerNamed nesting: conditions and-combine, inner name wins"
+        [ test "inner name wins, conditions and-combine" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented "@container inner (min-width: 400px) and (max-width: 700px){p{color:#000000;}}")
         ]
 
 

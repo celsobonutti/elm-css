@@ -269,31 +269,36 @@ mediaRange comparison val token =
         )
 
 
-{-| -}
+{-| `feature > value`
+-}
 gt : Value compatible -> MediaFeatureToken f -> Condition
 gt =
     mediaRange Structure.Gt
 
 
-{-| -}
+{-| `feature < value`
+-}
 lt : Value compatible -> MediaFeatureToken f -> Condition
 lt =
     mediaRange Structure.Lt
 
 
-{-| -}
+{-| `feature >= value`
+-}
 ge : Value compatible -> MediaFeatureToken f -> Condition
 ge =
     mediaRange Structure.Ge
 
 
-{-| -}
+{-| `feature <= value`
+-}
 le : Value compatible -> MediaFeatureToken f -> Condition
 le =
     mediaRange Structure.Le
 
 
-{-| -}
+{-| `feature = value`
+-}
 eq : Value compatible -> MediaFeatureToken f -> Condition
 eq =
     mediaRange Structure.Eq

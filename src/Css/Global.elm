@@ -341,9 +341,18 @@ containerRuleHelp name condition snippets =
                 (Preprocess.StyleBlockDeclaration _) :: rest ->
                     nestedContainerRules rest
 
-                (Preprocess.ContainerRule _ _ styleBlocks) :: rest ->
-                    -- nested @container: outer wins, inner condition dropped
-                    Preprocess.ContainerRule name condition styleBlocks
+                (Preprocess.ContainerRule innerName innerCondition styleBlocks) :: rest ->
+                    -- nested @container: conditions and-combine, inner name wins
+                    Preprocess.ContainerRule
+                        (case innerName of
+                            Just _ ->
+                                innerName
+
+                            Nothing ->
+                                name
+                        )
+                        (Structure.And [ condition, innerCondition ])
+                        styleBlocks
                         :: nestedContainerRules rest
 
                 first :: rest ->

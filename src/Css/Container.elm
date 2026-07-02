@@ -273,13 +273,15 @@ type alias Portrait =
     { value : String, orientation : Compatible }
 
 
-{-| -}
+{-| The `landscape` value for the `orientation` feature.
+-}
 landscape : Landscape
 landscape =
     { value = "landscape", orientation = Compatible }
 
 
-{-| -}
+{-| The `portrait` value for the `orientation` feature.
+-}
 portrait : Portrait
 portrait =
     { value = "portrait", orientation = Compatible }
@@ -292,19 +294,22 @@ orientation value =
     feature "orientation" value
 
 
-{-| -}
+{-| Feature token for range comparisons: `width |> gt (px 400)` ⇒ `(width > 400px)`.
+-}
 width : { value : String, containerFeature : Compatible, mediaFeature : Compatible }
 width =
     { value = "width", containerFeature = Compatible, mediaFeature = Compatible }
 
 
-{-| -}
+{-| Feature token for range comparisons: `height |> gt (px 400)` ⇒ `(height > 400px)`.
+-}
 height : { value : String, containerFeature : Compatible, mediaFeature : Compatible }
 height =
     { value = "height", containerFeature = Compatible, mediaFeature = Compatible }
 
 
-{-| -}
+{-| Feature token for range comparisons: `aspectRatio |> ge (ratio 16 9)` ⇒ `(aspect-ratio >= 16/9)`.
+-}
 aspectRatio : { value : String, containerFeature : Compatible, mediaFeature : Compatible }
 aspectRatio =
     { value = "aspect-ratio", containerFeature = Compatible, mediaFeature = Compatible }
@@ -422,6 +427,9 @@ containerType value =
 
 
 {-| The [`container-name`](https://developer.mozilla.org/en-US/docs/Web/CSS/container-name) property.
+
+Names must be valid CSS [custom-idents](https://developer.mozilla.org/en-US/docs/Web/CSS/custom-ident); this is not validated.
+
 -}
 containerName : String -> Style
 containerName name =
@@ -432,6 +440,8 @@ containerName name =
 
     containerNames [ "sidebar", "layout" ] -- container-name: sidebar layout
 
+Names must be valid CSS [custom-idents](https://developer.mozilla.org/en-US/docs/Web/CSS/custom-ident); this is not validated.
+
 -}
 containerNames : List String -> Style
 containerNames names =
@@ -441,6 +451,8 @@ containerNames names =
 {-| The [`container`](https://developer.mozilla.org/en-US/docs/Web/CSS/container) shorthand.
 
     container "sidebar" inlineSize -- container: sidebar / inline-size
+
+The name must be a valid CSS [custom-ident](https://developer.mozilla.org/en-US/docs/Web/CSS/custom-ident); this is not validated.
 
 -}
 container : String -> ContainerTypeValue a -> Style
