@@ -5,6 +5,7 @@ module Container exposing
     , containerProperties
     , containerRanges
     , containerRuleConstructors
+    , containerUnits
     , outputConditionForms
     , outputConditionQuery
     , outputContainerRule
@@ -13,7 +14,7 @@ module Container exposing
     , resolveWithContainer
     )
 
-import Css exposing (hex, px)
+import Css exposing (cqb, cqh, cqi, cqmax, cqmin, cqw, hex, px)
 import Css.Container as Container exposing (..)
 import Css.Global exposing (class, p)
 import Css.Preprocess as Preprocess exposing (stylesheet)
@@ -248,6 +249,32 @@ containerRuleConstructors =
                 prettyPrint (stylesheet [ p [ withContainerQuery "sidebar (min-width: 400px)" [ Css.color (hex "000000") ] ] ])
                     |> outdented
                     |> Expect.equal (outdented "@container sidebar (min-width: 400px){p{color:#000000;}}")
+        ]
+
+
+containerUnits : Test
+containerUnits =
+    describe "cq* units"
+        [ test "cqw renders inside a style" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ Css.width (cqw 50) ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{width:50cqw;}")
+        , test "cqh" <|
+            \_ -> prettyPrint (stylesheet [ p [ Css.width (cqh 50) ] ]) |> outdented |> Expect.equal (outdented "p{width:50cqh;}")
+        , test "cqi" <|
+            \_ -> prettyPrint (stylesheet [ p [ Css.width (cqi 50) ] ]) |> outdented |> Expect.equal (outdented "p{width:50cqi;}")
+        , test "cqb" <|
+            \_ -> prettyPrint (stylesheet [ p [ Css.width (cqb 50) ] ]) |> outdented |> Expect.equal (outdented "p{width:50cqb;}")
+        , test "cqmin" <|
+            \_ -> prettyPrint (stylesheet [ p [ Css.width (cqmin 50) ] ]) |> outdented |> Expect.equal (outdented "p{width:50cqmin;}")
+        , test "cqmax" <|
+            \_ -> prettyPrint (stylesheet [ p [ Css.width (cqmax 50) ] ]) |> outdented |> Expect.equal (outdented "p{width:50cqmax;}")
+        , test "cqw satisfies AbsoluteLength for container features" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ withContainer [ minWidth (cqw 50) ] [ Css.color (hex "000000") ] ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "@container (min-width: 50cqw){p{color:#000000;}}")
         ]
 
 
