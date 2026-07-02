@@ -31,6 +31,16 @@ resolveMediaRule mediaQueries styleBlocks =
     List.concatMap handleStyleBlock styleBlocks
 
 
+resolveContainerRule : Maybe String -> Structure.QueryCondition Structure.ContainerFeature -> List Preprocess.StyleBlock -> List Structure.Declaration
+resolveContainerRule name condition styleBlocks =
+    let
+        handleStyleBlock : Preprocess.StyleBlock -> List Structure.Declaration
+        handleStyleBlock styleBlock =
+            List.map (toContainerRule name condition) (expandStyleBlock styleBlock)
+    in
+    List.concatMap handleStyleBlock styleBlocks
+
+
 resolveSupportsRule : String -> List Snippet -> List Structure.Declaration
 resolveSupportsRule str snippets =
     let
@@ -80,6 +90,57 @@ toMediaRule mediaQueries declaration =
             declaration
 
 
+toContainerRule : Maybe String -> Structure.QueryCondition Structure.ContainerFeature -> Structure.Declaration -> Structure.Declaration
+toContainerRule name condition declaration =
+    case declaration of
+        Structure.StyleBlockDeclaration structureStyleBlock ->
+            Structure.ContainerRule name condition [ structureStyleBlock ]
+
+        Structure.ContainerRule innerName innerCondition structureStyleBlocks ->
+            let
+                combinedName =
+                    case innerName of
+                        Just _ ->
+                            innerName
+
+                        Nothing ->
+                            name
+
+                combinedCondition =
+                    Structure.And [ condition, innerCondition ]
+            in
+            Structure.ContainerRule combinedName combinedCondition structureStyleBlocks
+
+        Structure.MediaRule _ _ ->
+            -- outer wins: withMedia inside withContainer keeps the media rule,
+            -- the container condition is dropped (documented v1 limitation).
+            declaration
+
+        Structure.SupportsRule str declarations ->
+            Structure.SupportsRule str (List.map (toContainerRule name condition) declarations)
+
+        Structure.DocumentRule str1 str2 str3 str4 structureStyleBlock ->
+            Structure.DocumentRule str1 str2 str3 str4 structureStyleBlock
+
+        Structure.PageRule _ ->
+            declaration
+
+        Structure.FontFace _ ->
+            declaration
+
+        Structure.Keyframes _ ->
+            declaration
+
+        Structure.Viewport _ ->
+            declaration
+
+        Structure.CounterStyle _ ->
+            declaration
+
+        Structure.FontFeatureValues _ ->
+            declaration
+
+
 resolveFontFeatureValues : List ( String, List Property ) -> List Structure.Declaration
 resolveFontFeatureValues tuples =
     let
@@ -105,6 +166,9 @@ toDeclarations snippetDeclaration =
 
         Preprocess.MediaRule mediaQueries styleBlocks ->
             resolveMediaRule mediaQueries styleBlocks
+
+        Preprocess.ContainerRule name condition styleBlocks ->
+            resolveContainerRule name condition styleBlocks
 
         Preprocess.SupportsRule str snippets ->
             resolveSupportsRule str snippets
@@ -188,6 +252,9 @@ applyStyles styles declarations =
                         Preprocess.MediaRule mediaQueries styleBlocks ->
                             resolveMediaRule mediaQueries styleBlocks
 
+                        Preprocess.ContainerRule name condition styleBlocks ->
+                            resolveContainerRule name condition styleBlocks
+
                         Preprocess.SupportsRule str otherSnippets ->
                             resolveSupportsRule str otherSnippets
 
@@ -256,6 +323,22 @@ applyStyles styles declarations =
                                 |> applyStyles nestedStyles
                                 -- Finally, convert the block into a media rule.
                                 |> List.map (styleBlockToMediaRule mediaQueries)
+            in
+            applyStyles rest declarations ++ extraDeclarations
+
+        (Preprocess.WithContainer name condition nestedStyles) :: rest ->
+            let
+                extraDeclarations =
+                    case collectSelectors declarations of
+                        [] ->
+                            []
+
+                        firstSelector :: otherSelectors ->
+                            Structure.StyleBlock firstSelector otherSelectors []
+                                |> Structure.StyleBlockDeclaration
+                                |> List.singleton
+                                |> applyStyles nestedStyles
+                                |> List.map (toContainerRule name condition)
             in
             applyStyles rest declarations ++ extraDeclarations
 
