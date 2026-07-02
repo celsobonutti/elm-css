@@ -6,6 +6,8 @@ module Container exposing
     , containerRanges
     , containerRuleConstructors
     , containerUnits
+    , globalContainer
+    , globalContainerQuery
     , outputConditionForms
     , outputConditionQuery
     , outputContainerRule
@@ -16,7 +18,7 @@ module Container exposing
 
 import Css exposing (cqb, cqh, cqi, cqmax, cqmin, cqw, hex, px)
 import Css.Container as Container exposing (..)
-import Css.Global exposing (class, p)
+import Css.Global exposing (class, footer, p)
 import Css.Preprocess as Preprocess exposing (stylesheet)
 import Css.Structure as Structure exposing (..)
 import Css.Structure.Output as Output
@@ -275,6 +277,46 @@ containerUnits =
                 prettyPrint (stylesheet [ p [ withContainer [ minWidth (cqw 50) ] [ Css.color (hex "000000") ] ] ])
                     |> outdented
                     |> Expect.equal (outdented "@container (min-width: 50cqw){p{color:#000000;}}")
+        ]
+
+
+globalContainer : Test
+globalContainer =
+    let
+        input =
+            stylesheet
+                [ Css.Global.container [ Container.minWidth (px 400) ]
+                    [ Css.Global.footer [ Css.maxWidth (px 300) ] ]
+                ]
+
+        output =
+            "@container (min-width: 400px){footer{max-width:300px;}}"
+    in
+    describe "Css.Global.container"
+        [ test "renders a global @container rule" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented output)
+        ]
+
+
+globalContainerQuery : Test
+globalContainerQuery =
+    let
+        input =
+            stylesheet
+                [ Css.Global.containerQuery "sidebar (min-width: 400px)"
+                    [ Css.Global.footer [ Css.maxWidth (px 300) ] ]
+                ]
+
+        output =
+            "@container sidebar (min-width: 400px){footer{max-width:300px;}}"
+    in
+    describe "Css.Global.containerQuery"
+        [ test "renders a raw global @container rule" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented output)
         ]
 
 

@@ -11,6 +11,7 @@ module Css.Container exposing
     , orientation, Landscape, Portrait, landscape, portrait
     , ContainerTypeValue, containerType, normal, size
     , containerName, containerNames, container
+    , toStructureCondition
     )
 
 {-| Functions for building [`@container` queries](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@container)
@@ -55,6 +56,11 @@ and the container establishment properties.
 
 @docs ContainerTypeValue, containerType, normal, size
 @docs containerName, containerNames, container
+
+
+# Internal
+
+@docs toStructureCondition
 
 -}
 
@@ -123,6 +129,14 @@ combineAnd conditions =
 
         many ->
             Structure.And many
+
+
+{-| Internal-use helper for `Css.Global.container`. Converts a list of
+conditions (joined with `and`) into the underlying structure condition.
+-}
+toStructureCondition : List Condition -> Structure.QueryCondition Structure.ContainerFeature
+toStructureCondition =
+    combineAnd
 
 
 {-| Match if any of the given conditions match.
