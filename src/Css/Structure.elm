@@ -1,4 +1,4 @@
-module Css.Structure exposing (Compatible(..), Declaration(..), KeyframeProperty, MediaExpression, MediaQuery(..), MediaType(..), Number, Property(..), PseudoElement(..), RepeatableSimpleSelector(..), Selector(..), SelectorCombinator(..), SimpleSelectorSequence(..), StyleBlock(..), Stylesheet, TypeSelector(..), appendProperty, appendPseudoElementToLastSelector, appendRepeatable, appendRepeatableSelector, appendRepeatableToLastSelector, appendRepeatableWithCombinator, appendToLastSelector, applyPseudoElement, compactDeclarations, compactHelp, compactStylesheet, concatMapLast, concatMapLastStyleBlock, extendLastSelector, mapLast, styleBlockToMediaRule, withKeyframeDeclarations, withPropertyAppended)
+module Css.Structure exposing (Comparison(..), Compatible(..), ContainerFeature, Declaration(..), KeyframeProperty, MediaExpression, MediaQuery(..), MediaType(..), Number, Property(..), PseudoElement(..), QueryCondition(..), RangeExpression, RepeatableSimpleSelector(..), Selector(..), SelectorCombinator(..), SimpleSelectorSequence(..), StyleBlock(..), Stylesheet, TypeSelector(..), appendProperty, appendPseudoElementToLastSelector, appendRepeatable, appendRepeatableSelector, appendRepeatableToLastSelector, appendRepeatableWithCombinator, appendToLastSelector, applyPseudoElement, compactDeclarations, compactHelp, compactStylesheet, concatMapLast, concatMapLastStyleBlock, extendLastSelector, mapLast, styleBlockToContainerRule, styleBlockToMediaRule, withKeyframeDeclarations, withPropertyAppended)
 
 {-| A representation of the structure of a stylesheet. This module is concerned
 solely with representing valid stylesheets; it is not concerned with the
@@ -59,6 +59,7 @@ enumerated as follows.
 type Declaration
     = StyleBlockDeclaration StyleBlock
     | MediaRule (List MediaQuery) (List StyleBlock)
+    | ContainerRule (Maybe String) (QueryCondition ContainerFeature) (List StyleBlock)
     | SupportsRule String (List Declaration)
     | DocumentRule String String String String StyleBlock
     | PageRule (List Property)
@@ -87,6 +88,43 @@ type alias MediaExpression =
     { feature : String, value : Maybe String }
 
 
+{-| A generic query-condition tree, parameterized by leaf type so each public
+module supplies its own feature vocabulary. Used by both `@media` (via
+`ConditionQuery`) and `@container` (via `ContainerRule`).
+-}
+type QueryCondition leaf
+    = Feature leaf
+    | Range RangeExpression
+    | Not (QueryCondition leaf)
+    | And (List (QueryCondition leaf))
+    | Or (List (QueryCondition leaf))
+    | Raw String
+
+
+{-| A container feature test. Same shape as `MediaExpression`.
+-}
+type alias ContainerFeature =
+    { feature : String, value : Maybe String }
+
+
+{-| A range feature test. `lower`/`upper` are the optional bounds:
+gt/lt/ge/le/eq set exactly one; between sets both (inclusive, Le/Le).
+-}
+type alias RangeExpression =
+    { feature : String
+    , lower : Maybe ( Comparison, String )
+    , upper : Maybe ( Comparison, String )
+    }
+
+
+type Comparison
+    = Lt
+    | Le
+    | Gt
+    | Ge
+    | Eq
+
+
 {-| The components that make up a media query
 -}
 type MediaQuery
@@ -94,6 +132,7 @@ type MediaQuery
     | OnlyQuery MediaType (List MediaExpression)
     | NotQuery MediaType (List MediaExpression)
     | CustomQuery String
+    | ConditionQuery (QueryCondition MediaExpression)
 
 
 {-| A [CSS3 Selector](https://www.w3.org/TR/css3-selectors/). All selectors
@@ -167,6 +206,12 @@ appendProperty property declarations =
                 (mapLast (withPropertyAppended property) styleBlocks)
             ]
 
+        (ContainerRule name condition styleBlocks) :: [] ->
+            [ ContainerRule name
+                condition
+                (mapLast (withPropertyAppended property) styleBlocks)
+            ]
+
         -- TODO
         _ :: [] ->
             declarations
@@ -225,6 +270,31 @@ extendLastSelector selector declarations =
             case extendLastSelector selector [ MediaRule mediaQueries rest ] of
                 (MediaRule newMediaQueries newStyleBlocks) :: [] ->
                     [ MediaRule newMediaQueries (first :: newStyleBlocks) ]
+
+                newDeclarations ->
+                    newDeclarations
+
+        (ContainerRule name condition ((StyleBlock only [] properties) :: [])) :: [] ->
+            let
+                newStyleBlock =
+                    StyleBlock (appendRepeatableSelector selector only) [] properties
+            in
+            [ ContainerRule name condition [ newStyleBlock ] ]
+
+        (ContainerRule name condition ((StyleBlock first rest properties) :: [])) :: [] ->
+            let
+                newRest =
+                    mapLast (appendRepeatableSelector selector) rest
+
+                newStyleBlock =
+                    StyleBlock first newRest properties
+            in
+            [ ContainerRule name condition [ newStyleBlock ] ]
+
+        (ContainerRule name condition (first :: rest)) :: [] ->
+            case extendLastSelector selector [ ContainerRule name condition rest ] of
+                (ContainerRule newName newCondition newStyleBlocks) :: [] ->
+                    [ ContainerRule newName newCondition (first :: newStyleBlocks) ]
 
                 newDeclarations ->
                     newDeclarations
@@ -324,6 +394,17 @@ concatMapLastStyleBlock update declarations =
             case concatMapLastStyleBlock update [ MediaRule mediaQueries rest ] of
                 (MediaRule newMediaQueries newStyleBlocks) :: [] ->
                     [ MediaRule newMediaQueries (first :: newStyleBlocks) ]
+
+                newDeclarations ->
+                    newDeclarations
+
+        (ContainerRule name condition (styleBlock :: [])) :: [] ->
+            [ ContainerRule name condition (update styleBlock) ]
+
+        (ContainerRule name condition (first :: rest)) :: [] ->
+            case concatMapLastStyleBlock update [ ContainerRule name condition rest ] of
+                (ContainerRule newName newCondition newStyleBlocks) :: [] ->
+                    [ ContainerRule newName newCondition (first :: newStyleBlocks) ]
 
                 newDeclarations ->
                     newDeclarations
@@ -465,6 +546,13 @@ compactHelp declaration ( keyframesByName, declarations ) =
             else
                 ( keyframesByName, declaration :: declarations )
 
+        ContainerRule _ _ styleBlocks ->
+            if List.all (\(StyleBlock _ _ properties) -> List.isEmpty properties) styleBlocks then
+                ( keyframesByName, declarations )
+
+            else
+                ( keyframesByName, declaration :: declarations )
+
         SupportsRule _ otherDeclarations ->
             if List.isEmpty otherDeclarations then
                 ( keyframesByName, declarations )
@@ -526,6 +614,16 @@ styleBlockToMediaRule mediaQueries declaration =
     case declaration of
         StyleBlockDeclaration styleBlock ->
             MediaRule mediaQueries [ styleBlock ]
+
+        _ ->
+            declaration
+
+
+styleBlockToContainerRule : Maybe String -> QueryCondition ContainerFeature -> Declaration -> Declaration
+styleBlockToContainerRule name condition declaration =
+    case declaration of
+        StyleBlockDeclaration styleBlock ->
+            ContainerRule name condition [ styleBlock ]
 
         _ ->
             declaration

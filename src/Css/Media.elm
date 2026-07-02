@@ -16,6 +16,8 @@ module Css.Media exposing
     , Fine, Coarse, fine, coarse, pointer, anyPointer, CanHover, canHover
     , hover, anyHover
     , InitialOnly, Enabled, initialOnly, enabled, scripting
+    , Condition, expr, anyOf, allOf, inverse, condition
+    , gt, lt, ge, le, eq, between
     )
 
 {-| Functions for building [`@media` queries](https://developer.mozilla.org/en-US/docs/Web/CSS/Media_Queries/Using_media_queries).
@@ -72,6 +74,12 @@ module Css.Media exposing
 # Scripting Media Features
 
 @docs InitialOnly, Enabled, initialOnly, enabled, scripting
+
+
+# Condition algebra
+
+@docs Condition, expr, anyOf, allOf, inverse, condition
+@docs gt, lt, ge, le, eq, between
 
 -}
 
@@ -178,6 +186,135 @@ withMediaQuery queries =
     queries
         |> List.map Structure.CustomQuery
         |> Preprocess.WithMedia
+
+
+
+{--Condition algebra--}
+
+
+{-| An opaque media condition, for building `and`/`or`/`not` media queries with
+the range syntax. Distinct from `Css.Container.Condition` so the compiler keeps
+media features out of `@container` queries and vice versa.
+-}
+type Condition
+    = Condition (Structure.QueryCondition Structure.MediaExpression)
+
+
+unwrapCondition : Condition -> Structure.QueryCondition Structure.MediaExpression
+unwrapCondition (Condition c) =
+    c
+
+
+{-| Lift an existing media `Expression` into the condition algebra.
+
+    expr (minWidth (px 400))
+
+-}
+expr : Expression -> Condition
+expr expression =
+    Condition (Structure.Feature expression)
+
+
+{-| Combine conditions with `or`.
+-}
+anyOf : List Condition -> Condition
+anyOf conditions =
+    Condition (Structure.Or (List.map unwrapCondition conditions))
+
+
+{-| Combine conditions with `and`.
+-}
+allOf : List Condition -> Condition
+allOf conditions =
+    Condition (Structure.And (List.map unwrapCondition conditions))
+
+
+{-| Negate a condition. Named `inverse` because `not` is taken by media-type negation.
+-}
+inverse : Condition -> Condition
+inverse c =
+    Condition (Structure.Not (unwrapCondition c))
+
+
+{-| Turn a list of conditions (joined with `and`) into a `MediaQuery` that slots
+into `withMedia`'s query list.
+-}
+condition : List Condition -> MediaQuery
+condition conditions =
+    Structure.ConditionQuery (combineAnd conditions)
+
+
+combineAnd : List Condition -> Structure.QueryCondition Structure.MediaExpression
+combineAnd conditions =
+    case List.map unwrapCondition conditions of
+        single :: [] ->
+            single
+
+        many ->
+            Structure.And many
+
+
+type alias MediaFeatureToken f =
+    { f | value : String, mediaFeature : Compatible }
+
+
+mediaRange : Structure.Comparison -> Value compatible -> MediaFeatureToken f -> Condition
+mediaRange comparison val token =
+    Condition
+        (Structure.Range
+            { feature = token.value
+            , lower = Just ( comparison, val.value )
+            , upper = Nothing
+            }
+        )
+
+
+{-| `feature > value`
+-}
+gt : Value compatible -> MediaFeatureToken f -> Condition
+gt =
+    mediaRange Structure.Gt
+
+
+{-| `feature < value`
+-}
+lt : Value compatible -> MediaFeatureToken f -> Condition
+lt =
+    mediaRange Structure.Lt
+
+
+{-| `feature >= value`
+-}
+ge : Value compatible -> MediaFeatureToken f -> Condition
+ge =
+    mediaRange Structure.Ge
+
+
+{-| `feature <= value`
+-}
+le : Value compatible -> MediaFeatureToken f -> Condition
+le =
+    mediaRange Structure.Le
+
+
+{-| `feature = value`
+-}
+eq : Value compatible -> MediaFeatureToken f -> Condition
+eq =
+    mediaRange Structure.Eq
+
+
+{-| Inclusive on both ends: `(a <= feature <= b)`.
+-}
+between : Value compatibleLow -> Value compatibleHigh -> MediaFeatureToken f -> Condition
+between low high token =
+    Condition
+        (Structure.Range
+            { feature = token.value
+            , lower = Just ( Structure.Le, low.value )
+            , upper = Just ( Structure.Le, high.value )
+            }
+        )
 
 
 

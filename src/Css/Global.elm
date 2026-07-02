@@ -1,6 +1,6 @@
 module Css.Global exposing
     ( global, Snippet
-    , class, id, selector, everything, media, mediaQuery
+    , class, id, selector, everything, media, mediaQuery, container, containerQuery
     , children, descendants, adjacentSiblings, generalSiblings, each, withAttribute, withClass
     , typeSelector, html, body
     , article, header, footer, h1, h2, h3, h4, h5, h6, nav, menu, section, aside, time, details, summary
@@ -28,7 +28,7 @@ do to it using `Style` instead!
 
 # Statements
 
-@docs class, id, selector, everything, media, mediaQuery
+@docs class, id, selector, everything, media, mediaQuery, container, containerQuery
 
 
 # Combinators
@@ -77,6 +77,7 @@ do to it using `Style` instead!
 
 -}
 
+import Css.Container
 import Css.Media exposing (MediaQuery)
 import Css.Preprocess as Preprocess
     exposing
@@ -280,6 +281,84 @@ The above code translates into the following CSS.
 mediaQuery : List String -> List Snippet -> Snippet
 mediaQuery stringQueries snippets =
     media (List.map Structure.CustomQuery stringQueries) snippets
+
+
+{-| Combines conditions into a global `@container` rule.
+
+    global
+        [ container [ Container.minWidth (px 400) ]
+            [ footer [ Css.maxWidth (px 300) ] ]
+        ]
+
+-}
+container : List Css.Container.Condition -> List Snippet -> Snippet
+container conditions snippets =
+    containerRuleHelp Nothing (Css.Container.toStructureCondition conditions) snippets
+
+
+{-| Manually specify a global `@container` rule with a raw whole-condition string.
+
+    global
+        [ containerQuery "sidebar (min-width: 400px)"
+            [ footer [ Css.maxWidth (px 300) ] ]
+        ]
+
+-}
+containerQuery : String -> List Snippet -> Snippet
+containerQuery raw snippets =
+    containerRuleHelp Nothing (Structure.Raw raw) snippets
+
+
+containerRuleHelp : Maybe String -> Structure.QueryCondition Structure.ContainerFeature -> List Snippet -> Snippet
+containerRuleHelp name condition snippets =
+    let
+        snippetDeclarations : List Preprocess.SnippetDeclaration
+        snippetDeclarations =
+            List.concatMap unwrapSnippet snippets
+
+        extractStyleBlocks : List Preprocess.SnippetDeclaration -> List Preprocess.StyleBlock
+        extractStyleBlocks declarations =
+            case declarations of
+                [] ->
+                    []
+
+                (Preprocess.StyleBlockDeclaration styleBlock) :: rest ->
+                    styleBlock :: extractStyleBlocks rest
+
+                _ :: rest ->
+                    extractStyleBlocks rest
+
+        containerRuleFromStyleBlocks : Preprocess.SnippetDeclaration
+        containerRuleFromStyleBlocks =
+            Preprocess.ContainerRule name condition (extractStyleBlocks snippetDeclarations)
+
+        nestedContainerRules : List Preprocess.SnippetDeclaration -> List Preprocess.SnippetDeclaration
+        nestedContainerRules declarations =
+            case declarations of
+                [] ->
+                    []
+
+                (Preprocess.StyleBlockDeclaration _) :: rest ->
+                    nestedContainerRules rest
+
+                (Preprocess.ContainerRule innerName innerCondition styleBlocks) :: rest ->
+                    -- nested @container: conditions and-combine, inner name wins
+                    Preprocess.ContainerRule
+                        (case innerName of
+                            Just _ ->
+                                innerName
+
+                            Nothing ->
+                                name
+                        )
+                        (Structure.And [ condition, innerCondition ])
+                        styleBlocks
+                        :: nestedContainerRules rest
+
+                first :: rest ->
+                    first :: nestedContainerRules rest
+    in
+    Preprocess.Snippet (containerRuleFromStyleBlocks :: nestedContainerRules snippetDeclarations)
 
 
 {-| Apply styles in a list of snippets to the direct children of a selector

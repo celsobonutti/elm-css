@@ -1,4 +1,4 @@
-module Css.Structure.Output exposing (mediaQueryToString, prettyPrint, selectorToString)
+module Css.Structure.Output exposing (conditionToString, mediaQueryToString, prettyPrint, selectorToString)
 
 import Css.String
 import Css.Structure exposing (..)
@@ -70,6 +70,26 @@ prettyPrintDeclaration decl =
             in
             "@media " ++ query ++ "{" ++ blocks ++ "}"
 
+        ContainerRule name condition styleBlocks ->
+            let
+                blocks =
+                    Css.String.mapJoin prettyPrintStyleBlock "\n" styleBlocks
+
+                namePrefix =
+                    case name of
+                        Just str ->
+                            str ++ " "
+
+                        Nothing ->
+                            ""
+            in
+            "@container "
+                ++ namePrefix
+                ++ conditionToString containerFeatureToString condition
+                ++ "{"
+                ++ blocks
+                ++ "}"
+
         SupportsRule _ _ ->
             "TODO"
 
@@ -117,6 +137,9 @@ mediaQueryToString mediaQuery =
         NotQuery mediaType expressions ->
             prefixWith "not" mediaType expressions
 
+        ConditionQuery condition ->
+            conditionToString mediaExpressionToString condition
+
         CustomQuery str ->
             str
 
@@ -143,6 +166,97 @@ mediaExpressionToString expression =
                 |> Maybe.withDefault ""
            )
         ++ ")"
+
+
+comparisonToString : Comparison -> String
+comparisonToString comparison =
+    case comparison of
+        Lt ->
+            "<"
+
+        Le ->
+            "<="
+
+        Gt ->
+            ">"
+
+        Ge ->
+            ">="
+
+        Eq ->
+            "="
+
+
+containerFeatureToString : ContainerFeature -> String
+containerFeatureToString =
+    mediaExpressionToString
+
+
+rangeToString : RangeExpression -> String
+rangeToString { feature, lower, upper } =
+    case ( lower, upper ) of
+        ( Just ( lowerCmp, lowerVal ), Just ( upperCmp, upperVal ) ) ->
+            "("
+                ++ lowerVal
+                ++ " "
+                ++ comparisonToString lowerCmp
+                ++ " "
+                ++ feature
+                ++ " "
+                ++ comparisonToString upperCmp
+                ++ " "
+                ++ upperVal
+                ++ ")"
+
+        ( Just ( cmp, val ), Nothing ) ->
+            "(" ++ feature ++ " " ++ comparisonToString cmp ++ " " ++ val ++ ")"
+
+        ( Nothing, Just ( cmp, val ) ) ->
+            "(" ++ feature ++ " " ++ comparisonToString cmp ++ " " ++ val ++ ")"
+
+        ( Nothing, Nothing ) ->
+            "(" ++ feature ++ ")"
+
+
+{-| Serialize a query condition. `leafToString` renders the leaf feature
+(already including its own parentheses). Composite children nested inside a
+composite are wrapped in an extra pair of parens to keep the CSS valid.
+-}
+conditionToString : (leaf -> String) -> QueryCondition leaf -> String
+conditionToString leafToString condition =
+    let
+        grouped child =
+            case child of
+                Feature _ ->
+                    conditionToString leafToString child
+
+                Range _ ->
+                    conditionToString leafToString child
+
+                Raw _ ->
+                    conditionToString leafToString child
+
+                _ ->
+                    "(" ++ conditionToString leafToString child ++ ")"
+    in
+    case condition of
+        Feature leaf ->
+            leafToString leaf
+
+        Range range ->
+            rangeToString range
+
+        Not child ->
+            "not " ++ grouped child
+
+        And children ->
+            String.join " and " (List.map grouped children)
+
+        Or children ->
+            String.join " or " (List.map grouped children)
+
+        Raw str ->
+            str
 
 
 simpleSelectorSequenceToString : SimpleSelectorSequence -> String

@@ -4,7 +4,7 @@ module Css exposing
     , Color, all, important, solid, transparent, rgb, rgba, hsl, hsla, hex
     , featureTag, featureTag2, featureOn, featureOff
     , borderCollapse, borderColor, borderColor2, borderColor3, borderColor4, borderBottomLeftRadius, borderBottomLeftRadius2, borderBottomRightRadius, borderBottomRightRadius2, borderTopLeftRadius, borderTopLeftRadius2, borderTopRightRadius, borderTopRightRadius2, borderRadius, borderRadius2, borderRadius3, borderRadius4, borderWidth, borderWidth2, borderWidth3, borderWidth4, borderBottomWidth, borderLeftWidth, borderRightWidth, borderTopWidth, borderBottomStyle, borderLeftStyle, borderRightStyle, borderTopStyle, borderStyle, borderBottomColor, borderLeftColor, borderRightColor, borderTopColor, borderBox, contentBox, border, border2, border3, borderTop, borderTop2, borderTop3, borderBottom, borderBottom2, borderBottom3, borderLeft, borderLeft2, borderLeft3, borderRight, borderRight2, borderRight3, borderImageOutset, borderImageOutset2, borderImageOutset3, borderImageOutset4, borderImageWidth, borderImageWidth2, borderImageWidth3, borderImageWidth4, scroll, visible, block, inlineBlock, inlineFlex, inline, none, auto, inherit, unset, initial, noWrap, top, static, fixed, sticky, relative, absolute, position, float, bottom, middle, baseline, sub, super, textTop, textBottom, hidden, wavy, dotted, dashed, double, groove, ridge, inset, outset, matrix, matrix3d, perspective, rotate3d, rotateX, rotateY, rotateZ, scale, scale2, scale3d, scaleX, scaleY, skew, skew2, skewX, skewY, translate, translate2, translate3d, translateX, translateY, translateZ, rotate, fillBox, viewBox, flat, preserve3d, content, wrapReverse, wrap, flexStart, flexEnd, stretch, row, rowReverse, column, columnReverse, serif, sansSerif, monospace, cursive, fantasy, xxSmall, xSmall, small, large, xLarge, xxLarge, smaller, larger, normal, italic, oblique, bold, lighter, bolder, smallCaps, allSmallCaps, petiteCaps, allPetiteCaps, unicase, titlingCaps, commonLigatures, noCommonLigatures, discretionaryLigatures, noDiscretionaryLigatures, historicalLigatures, noHistoricalLigatures, contextual, noContextual, liningNums, oldstyleNums, proportionalNums, tabularNums, diagonalFractions, stackedFractions, ordinal, slashedZero, default, pointer, crosshair, contextMenu, help, progress, wait, cell, text_, verticalText, cursorAlias, copy, move, noDrop, notAllowed, eResize, nResize, neResize, nwResize, sResize, seResize, swResize, wResize, ewResize, nsResize, neswResize, nwseResize, colResize, rowResize, allScroll, zoomIn, zoomOut, grab, grabbing, visiblePainted, visibleFill, visibleStroke, painted, stroke
-    , Length, pct, px, em, pt, ex, ch, rem, vh, vw, vmin, vmax, mm, cm, inches, pc, int, num, zero, calc, plus, minus
+    , Length, pct, px, em, pt, ex, ch, rem, vh, vw, vmin, vmax, cqw, cqh, cqi, cqb, cqmin, cqmax, mm, cm, inches, pc, int, num, zero, calc, plus, minus
     , Px, Em, Rem, Pct, Ex, Ch, Vh, Vw, Vmin, Vmax, Mm, Cm, In, Pt, Pc
     , deg, rad, grad, turn
     , Duration, sec, ms
@@ -365,7 +365,7 @@ functions let you define custom properties and selectors, respectively.
 
 # Length
 
-@docs Length, pct, px, em, pt, ex, ch, rem, vh, vw, vmin, vmax, mm, cm, inches, pc, int, num, zero, calc, plus, minus
+@docs Length, pct, px, em, pt, ex, ch, rem, vh, vw, vmin, vmax, cqw, cqh, cqi, cqb, cqmin, cqmax, mm, cm, inches, pc, int, num, zero, calc, plus, minus
 
 
 # Length Units
@@ -2335,6 +2335,108 @@ vmax =
 
 type VMaxUnits
     = VMaxUnits
+
+
+{-| [`cqw`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqw) container query width units.
+-}
+type alias Cqw =
+    ExplicitLength CqwUnits
+
+
+{-| [`cqw`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqw) container query width units.
+-}
+cqw : Float -> Cqw
+cqw =
+    lengthConverter CqwUnits "cqw"
+
+
+type CqwUnits
+    = CqwUnits
+
+
+{-| [`cqh`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqh) container query height units.
+-}
+type alias Cqh =
+    ExplicitLength CqhUnits
+
+
+{-| [`cqh`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqh) container query height units.
+-}
+cqh : Float -> Cqh
+cqh =
+    lengthConverter CqhUnits "cqh"
+
+
+type CqhUnits
+    = CqhUnits
+
+
+{-| [`cqi`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqi) container query inline-size units.
+-}
+type alias Cqi =
+    ExplicitLength CqiUnits
+
+
+{-| [`cqi`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqi) container query inline-size units.
+-}
+cqi : Float -> Cqi
+cqi =
+    lengthConverter CqiUnits "cqi"
+
+
+type CqiUnits
+    = CqiUnits
+
+
+{-| [`cqb`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqb) container query block-size units.
+-}
+type alias Cqb =
+    ExplicitLength CqbUnits
+
+
+{-| [`cqb`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqb) container query block-size units.
+-}
+cqb : Float -> Cqb
+cqb =
+    lengthConverter CqbUnits "cqb"
+
+
+type CqbUnits
+    = CqbUnits
+
+
+{-| [`cqmin`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqmin) container query min units.
+-}
+type alias Cqmin =
+    ExplicitLength CqminUnits
+
+
+{-| [`cqmin`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqmin) container query min units.
+-}
+cqmin : Float -> Cqmin
+cqmin =
+    lengthConverter CqminUnits "cqmin"
+
+
+type CqminUnits
+    = CqminUnits
+
+
+{-| [`cqmax`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqmax) container query max units.
+-}
+type alias Cqmax =
+    ExplicitLength CqmaxUnits
+
+
+{-| [`cqmax`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#cqmax) container query max units.
+-}
+cqmax : Float -> Cqmax
+cqmax =
+    lengthConverter CqmaxUnits "cqmax"
+
+
+type CqmaxUnits
+    = CqmaxUnits
 
 
 {-| [`px`](https://developer.mozilla.org/en-US/docs/Web/CSS/length#px) units.

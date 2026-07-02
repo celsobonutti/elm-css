@@ -1,6 +1,7 @@
-module Media exposing (basicMediaQuery, bug352, expectFeatureWorks, mediaFeatures, mediaTypes, testFeature, testMedia, testMediaQuery, testMediaType, testUnparameterizedFeature, testWithMedia, testWithMediaQuery, withMediaInside, withMediaInsideAndOtheDeclarations, withMediaOutside, withMediaOutsideAndOtherDeclarations)
+module Media exposing (basicMediaQuery, bug352, expectFeatureWorks, mediaConditionAlgebra, mediaFeatures, mediaRangeComparisons, mediaTypes, testFeature, testMedia, testMediaQuery, testMediaType, testUnparameterizedFeature, testWithMedia, testWithMediaQuery, withMediaInside, withMediaInsideAndOtheDeclarations, withMediaOutside, withMediaOutsideAndOtherDeclarations)
 
 import Css exposing (..)
+import Css.Container as Container
 import Css.Global exposing (Snippet, a, body, button, class, li, media, mediaQuery, p, ul)
 import Css.Media as Media exposing (..)
 import Css.Preprocess exposing (stylesheet)
@@ -488,6 +489,55 @@ testWithMediaQuery =
     in
     describe "withMediaQuery test"
         [ test "pretty prints the expected output" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented output)
+        ]
+
+
+mediaConditionAlgebra : Test
+mediaConditionAlgebra =
+    let
+        input =
+            stylesheet
+                [ body
+                    [ withMedia
+                        [ condition
+                            [ expr (Media.minWidth (px 400))
+                            , anyOf [ expr (orientation landscape), inverse (expr (Media.hover canHover)) ]
+                            ]
+                        ]
+                        [ Css.color (hex "000000") ]
+                    ]
+                ]
+
+        output =
+            "@media (min-width: 400px) and ((orientation: landscape) or (not (hover: hover))){body{color:#000000;}}"
+    in
+    describe "Css.Media condition algebra"
+        [ test "renders nested and/or/not" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented output)
+        ]
+
+
+mediaRangeComparisons : Test
+mediaRangeComparisons =
+    let
+        input =
+            stylesheet
+                [ body
+                    [ withMedia [ condition [ Container.width |> gt (px 600) ] ]
+                        [ Css.color (hex "000000") ]
+                    ]
+                ]
+
+        output =
+            "@media (width > 600px){body{color:#000000;}}"
+    in
+    describe "Css.Media range comparisons with shared Container tokens"
+        [ test "renders width > 600px" <|
             \_ ->
                 outdented (prettyPrint input)
                     |> Expect.equal (outdented output)

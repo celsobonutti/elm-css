@@ -129,6 +129,9 @@ getOverloadedProperty functionName desiredKey style =
         Preprocess.WithMedia _ _ ->
             property desiredKey ("elm-css-error-cannot-apply-" ++ functionName ++ "-with-inapplicable-Style-for-media-query")
 
+        Preprocess.WithContainer _ _ _ ->
+            property desiredKey ("elm-css-error-cannot-apply-" ++ functionName ++ "-with-inapplicable-Style-for-container-query")
+
         Preprocess.WithKeyframes _ ->
             property desiredKey ("elm-css-error-cannot-apply-" ++ functionName ++ "-with-inapplicable-Style-for-keyframes")
 

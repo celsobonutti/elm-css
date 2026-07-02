@@ -1,6 +1,7 @@
 ## Releases
 | Version | Notes |
 | ------- | ----- |
+| Unreleased (18.1.0) | Add `Css.Container` for `@container` queries: typed size features, `and`/`or`/`not` combinators, range syntax (`gt`/`lt`/`ge`/`le`/`eq`/`between`), named containers, `containerType`/`containerName`/`container` properties, and raw escape hatches. Add an additive condition algebra to `Css.Media` (`condition`, `expr`, `anyOf`, `allOf`, `inverse`, plus range comparisons) sharing tokens with `Css.Container`. Add `cqw`/`cqh`/`cqi`/`cqb`/`cqmin`/`cqmax` container query length units. Add `Css.Global.container`/`Css.Global.containerQuery` for global `@container` snippets.
 | [18.0.0](https://github.com/rtfeldman/elm-css/tree/18.0.0) | Add `line-height: normal` ([#578](https://github.com/rtfeldman/elm-css/pull/578)) and `keyedLazy` ([#584](https://github.com/rtfeldman/elm-css/pull/584))
 | [17.1.1](https://github.com/rtfeldman/elm-css/tree/17.1.1) | Allow multiple `css` attributes on node ([#566](https://github.com/rtfeldman/elm-css/pull/566))
 | [17.1.0](https://github.com/rtfeldman/elm-css/tree/17.1.0) | Support nonces ([#569](https://github.com/rtfeldman/elm-css/pull/569))
