@@ -63,6 +63,11 @@ toMediaRule mediaQueries declaration =
         Structure.MediaRule newMediaQueries structureStyleBlocks ->
             Structure.MediaRule (mediaQueries ++ newMediaQueries) structureStyleBlocks
 
+        Structure.ContainerRule _ _ structureStyleBlocks ->
+            -- outer wins: withContainer inside withMedia collapses to a MediaRule,
+            -- dropping the container condition (documented v1 limitation).
+            Structure.MediaRule mediaQueries structureStyleBlocks
+
         Structure.SupportsRule str declarations ->
             Structure.SupportsRule str (List.map (toMediaRule mediaQueries) declarations)
 
