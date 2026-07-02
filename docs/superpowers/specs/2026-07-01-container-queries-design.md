@@ -106,12 +106,14 @@ without constructors):
 - `And cs` / `Or cs` → children joined with ` and ` / ` or `.
 - `Raw s` → `s` verbatim.
 
-**Parenthesization:** `Feature` emits its own parens. Composite children
-(`And`/`Or`/`Not`) nested inside another composite are always wrapped in an
-extra pair of parens. CSS forbids mixing `and`/`or`/`not` at one level without
-grouping; the tree makes that unrepresentable and the always-parenthesize rule
+**Parenthesization:** `Feature` and `Range` emit their own parens. Composite
+children (`And`/`Or`/`Not`) nested inside another composite are always wrapped
+in an extra pair of parens; a composite at the top level of a rule is NOT
+(valid per the `<container-condition>` grammar, and consistent with the bare
+top-level `and`-join). CSS forbids mixing `and`/`or`/`not` at one level without
+grouping; the tree makes that unrepresentable and the parenthesize-nested rule
 keeps output valid, e.g.
-`@container ((min-width: 400px) or (not (orientation: landscape))) { … }`.
+`@container (min-width: 400px) or (not (orientation: landscape)) { … }`.
 
 `ContainerRule` emission: `"@container "` ++ optional `name ++ " "` ++ condition
 ++ `"{"` ++ blocks ++ `"}"`. `ConditionQuery` emission inside a media query
