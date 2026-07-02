@@ -1,6 +1,22 @@
-module Container exposing (outputContainerRule, outputConditionForms, outputRangeForms, outputConditionQuery, resolveWithContainer, resolveNestedContainer)
+module Container exposing
+    ( containerCombinators
+    , containerFeatureTest
+    , containerFeatures
+    , containerProperties
+    , containerRanges
+    , containerRuleConstructors
+    , outputConditionForms
+    , outputConditionQuery
+    , outputContainerRule
+    , outputRangeForms
+    , resolveNestedContainer
+    , resolveWithContainer
+    )
 
-import Css.Preprocess as Preprocess
+import Css exposing (hex, px)
+import Css.Container as Container exposing (..)
+import Css.Global exposing (class, p)
+import Css.Preprocess as Preprocess exposing (stylesheet)
 import Css.Structure as Structure exposing (..)
 import Css.Structure.Output as Output
 import Expect
@@ -155,4 +171,117 @@ resolveNestedContainer =
             \_ ->
                 TestUtil.outdented (prettyPrint input)
                     |> Expect.equal (TestUtil.outdented "@container (min-width: 400px) and (orientation: landscape){p{color:#000000;}}")
+        ]
+
+
+containerFeatureTest : String -> List ( Condition, String ) -> Test
+containerFeatureTest label pairs =
+    describe (label ++ " container feature")
+        (List.indexedMap
+            (\n ( cond, expected ) ->
+                test (label ++ String.fromInt n) <|
+                    \_ ->
+                        prettyPrint (stylesheet [ p [ withContainer [ cond ] [ Css.color (hex "000000") ] ] ])
+                            |> outdented
+                            |> Expect.equal (outdented ("@container " ++ expected ++ "{p{color:#000000;}}"))
+            )
+            pairs
+        )
+
+
+containerFeatures : Test
+containerFeatures =
+    describe "Css.Container features"
+        [ containerFeatureTest "min-width" [ ( minWidth (px 400), "(min-width: 400px)" ) ]
+        , containerFeatureTest "max-width" [ ( maxWidth (px 800), "(max-width: 800px)" ) ]
+        , containerFeatureTest "min-height" [ ( minHeight (px 300), "(min-height: 300px)" ) ]
+        , containerFeatureTest "max-height" [ ( maxHeight (px 600), "(max-height: 600px)" ) ]
+        , containerFeatureTest "min-inline-size" [ ( minInlineSize (px 400), "(min-inline-size: 400px)" ) ]
+        , containerFeatureTest "max-inline-size" [ ( maxInlineSize (px 400), "(max-inline-size: 400px)" ) ]
+        , containerFeatureTest "min-block-size" [ ( minBlockSize (px 400), "(min-block-size: 400px)" ) ]
+        , containerFeatureTest "max-block-size" [ ( maxBlockSize (px 400), "(max-block-size: 400px)" ) ]
+        , containerFeatureTest "min-aspect-ratio" [ ( minAspectRatio (ratio 4 3), "(min-aspect-ratio: 4/3)" ) ]
+        , containerFeatureTest "max-aspect-ratio" [ ( maxAspectRatio (ratio 16 9), "(max-aspect-ratio: 16/9)" ) ]
+        , containerFeatureTest "orientation" [ ( orientation landscape, "(orientation: landscape)" ), ( orientation portrait, "(orientation: portrait)" ) ]
+        ]
+
+
+containerRanges : Test
+containerRanges =
+    describe "Css.Container range comparisons"
+        [ containerFeatureTest "gt" [ ( Container.width |> gt (px 400), "(width > 400px)" ) ]
+        , containerFeatureTest "lt" [ ( Container.width |> lt (px 400), "(width < 400px)" ) ]
+        , containerFeatureTest "ge" [ ( Container.width |> ge (px 400), "(width >= 400px)" ) ]
+        , containerFeatureTest "le" [ ( Container.width |> le (px 400), "(width <= 400px)" ) ]
+        , containerFeatureTest "eq" [ ( Container.width |> eq (px 400), "(width = 400px)" ) ]
+        , containerFeatureTest "between" [ ( Container.width |> between (px 200) (px 700), "(200px <= width <= 700px)" ) ]
+        , containerFeatureTest "aspect-ratio ge" [ ( aspectRatio |> ge (ratio 16 9), "(aspect-ratio >= 16/9)" ) ]
+        , containerFeatureTest "inlineSize as feature token" [ ( inlineSize |> gt (px 400), "(inline-size > 400px)" ) ]
+        ]
+
+
+containerCombinators : Test
+containerCombinators =
+    describe "Css.Container combinators"
+        [ containerFeatureTest "anyOf" [ ( anyOf [ minWidth (px 400), orientation landscape ], "(min-width: 400px) or (orientation: landscape)" ) ]
+        , containerFeatureTest "allOf inside anyOf" [ ( anyOf [ allOf [ minWidth (px 400), minHeight (px 300) ], orientation landscape ], "((min-width: 400px) and (min-height: 300px)) or (orientation: landscape)" ) ]
+        , containerFeatureTest "not under anyOf" [ ( anyOf [ minWidth (px 400), Container.not (orientation landscape) ], "(min-width: 400px) or (not (orientation: landscape))" ) ]
+        , containerFeatureTest "rawCondition" [ ( rawCondition "style(--theme: dark)", "style(--theme: dark)" ) ]
+        ]
+
+
+containerRuleConstructors : Test
+containerRuleConstructors =
+    describe "Css.Container rule constructors"
+        [ test "withContainer joins top-level list with and" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ withContainer [ minWidth (px 400), orientation landscape ] [ Css.color (hex "000000") ] ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "@container (min-width: 400px) and (orientation: landscape){p{color:#000000;}}")
+        , test "withContainerNamed" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ withContainerNamed "sidebar" [ minWidth (px 400) ] [ Css.color (hex "000000") ] ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "@container sidebar (min-width: 400px){p{color:#000000;}}")
+        , test "withContainerQuery raw passthrough" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ withContainerQuery "sidebar (min-width: 400px)" [ Css.color (hex "000000") ] ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "@container sidebar (min-width: 400px){p{color:#000000;}}")
+        ]
+
+
+containerProperties : Test
+containerProperties =
+    describe "Css.Container establishment properties"
+        [ test "containerType size" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ containerType Container.size ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container-type:size;}")
+        , test "containerType normal" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ containerType Container.normal ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container-type:normal;}")
+        , test "containerType inlineSize (dual-role)" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ containerType inlineSize ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container-type:inline-size;}")
+        , test "containerName" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ containerName "sidebar" ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container-name:sidebar;}")
+        , test "containerNames" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ containerNames [ "a", "b" ] ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container-name:a b;}")
+        , test "container shorthand" <|
+            \_ ->
+                prettyPrint (stylesheet [ p [ container "sidebar" inlineSize ] ])
+                    |> outdented
+                    |> Expect.equal (outdented "p{container:sidebar / inline-size;}")
         ]
