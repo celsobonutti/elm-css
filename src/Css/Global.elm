@@ -342,7 +342,7 @@ containerRuleHelp name condition snippets =
                     nestedContainerRules rest
 
                 (Preprocess.ContainerRule _ _ styleBlocks) :: rest ->
-                    -- nested @container: outer wins, combine conditions with And
+                    -- nested @container: outer wins, inner condition dropped
                     Preprocess.ContainerRule name condition styleBlocks
                         :: nestedContainerRules rest
 

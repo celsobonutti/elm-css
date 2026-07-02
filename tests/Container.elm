@@ -16,11 +16,14 @@ module Container exposing
     , outputRangeForms
     , resolveNestedContainer
     , resolveWithContainer
+    , withContainerMediaOuterWins
+    , withMediaContainerOuterWins
     )
 
 import Css exposing (cqb, cqh, cqi, cqmax, cqmin, cqw, hex, px)
 import Css.Container as Container exposing (..)
 import Css.Global exposing (class, footer, p)
+import Css.Media as Media exposing (only, screen, withMedia)
 import Css.Preprocess as Preprocess exposing (stylesheet)
 import Css.Structure as Structure exposing (..)
 import Css.Structure.Output as Output
@@ -375,6 +378,50 @@ containerSelectorExtension =
             \_ ->
                 outdented (prettyPrint input)
                     |> Expect.equal (outdented "@container (min-width: 400px){p > a{color:#000000;}}")
+        ]
+
+
+withMediaContainerOuterWins : Test
+withMediaContainerOuterWins =
+    let
+        input =
+            stylesheet
+                [ p
+                    [ withMedia [ only screen [ Media.minWidth (px 600) ] ]
+                        [ withContainer [ minWidth (px 400) ]
+                            [ Css.color (hex "000000") ]
+                        ]
+                    ]
+                ]
+    in
+    -- Documented v1: outer withMedia wins, inner container condition dropped.
+    describe "withContainer inside withMedia: outer wins"
+        [ test "drops the inner container condition" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented "@media only screen and (min-width: 600px){p{color:#000000;}}")
+        ]
+
+
+withContainerMediaOuterWins : Test
+withContainerMediaOuterWins =
+    let
+        input =
+            stylesheet
+                [ p
+                    [ withContainer [ minWidth (px 400) ]
+                        [ withMedia [ only screen [] ]
+                            [ Css.color (hex "000000") ]
+                        ]
+                    ]
+                ]
+    in
+    -- Mirror direction: outer withContainer wins, inner media condition dropped.
+    describe "withMedia inside withContainer: outer wins"
+        [ test "drops the inner media condition" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented "@container (min-width: 400px){p{color:#000000;}}")
         ]
 
 

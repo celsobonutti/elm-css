@@ -111,10 +111,10 @@ toContainerRule name condition declaration =
             in
             Structure.ContainerRule combinedName combinedCondition structureStyleBlocks
 
-        Structure.MediaRule _ _ ->
-            -- outer wins: withMedia inside withContainer keeps the media rule,
-            -- the container condition is dropped (documented v1 limitation).
-            declaration
+        Structure.MediaRule _ structureStyleBlocks ->
+            -- outer wins: the outer container rule replaces the inner media
+            -- rule, dropping the media condition (documented v1 limitation).
+            Structure.ContainerRule name condition structureStyleBlocks
 
         Structure.SupportsRule str declarations ->
             Structure.SupportsRule str (List.map (toContainerRule name condition) declarations)
@@ -309,6 +309,17 @@ applyStyles styles declarations =
 
         (Preprocess.WithMedia mediaQueries nestedStyles) :: rest ->
             let
+                wrapInMedia declaration =
+                    case declaration of
+                        Structure.ContainerRule _ _ styleBlocks ->
+                            -- outer wins: the outer media rule replaces the inner
+                            -- container rule, dropping the container condition
+                            -- (documented v1 limitation).
+                            Structure.MediaRule mediaQueries styleBlocks
+
+                        _ ->
+                            styleBlockToMediaRule mediaQueries declaration
+
                 extraDeclarations =
                     case collectSelectors declarations of
                         [] ->
@@ -322,7 +333,7 @@ applyStyles styles declarations =
                                 -- Then apply the nested styles.
                                 |> applyStyles nestedStyles
                                 -- Finally, convert the block into a media rule.
-                                |> List.map (styleBlockToMediaRule mediaQueries)
+                                |> List.map wrapInMedia
             in
             applyStyles rest declarations ++ extraDeclarations
 
