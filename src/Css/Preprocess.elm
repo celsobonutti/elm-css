@@ -30,6 +30,7 @@ type Style
     | NestSnippet Structure.SelectorCombinator (List Snippet)
     | WithPseudoElement Structure.PseudoElement (List Style)
     | WithMedia (List MediaQuery) (List Style)
+    | WithContainer (Maybe String) (Structure.QueryCondition Structure.ContainerFeature) (List Style)
     | WithKeyframes String
     | ApplyStyles (List Style)
 
@@ -41,6 +42,7 @@ type Snippet
 type SnippetDeclaration
     = StyleBlockDeclaration StyleBlock
     | MediaRule (List MediaQuery) (List StyleBlock)
+    | ContainerRule (Maybe String) (Structure.QueryCondition Structure.ContainerFeature) (List StyleBlock)
     | SupportsRule String (List Snippet)
     | DocumentRule String String String String StyleBlock
     | PageRule (List Property)
@@ -112,6 +114,9 @@ mapProperties update style =
         WithMedia _ _ ->
             style
 
+        WithContainer _ _ _ ->
+            style
+
         WithKeyframes _ ->
             style
 
@@ -148,6 +153,9 @@ mapLastProperty update style =
             style
 
         WithMedia _ _ ->
+            style
+
+        WithContainer _ _ _ ->
             style
 
         WithKeyframes _ ->
