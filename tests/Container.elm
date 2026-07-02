@@ -2,9 +2,11 @@ module Container exposing
     ( containerCombinators
     , containerFeatureTest
     , containerFeatures
+    , containerHashDistinct
     , containerProperties
     , containerRanges
     , containerRuleConstructors
+    , containerSelectorExtension
     , containerUnits
     , globalContainer
     , globalContainerQuery
@@ -353,4 +355,42 @@ containerProperties =
                 prettyPrint (stylesheet [ p [ container "sidebar" inlineSize ] ])
                     |> outdented
                     |> Expect.equal (outdented "p{container:sidebar / inline-size;}")
+        ]
+
+
+containerSelectorExtension : Test
+containerSelectorExtension =
+    let
+        input =
+            stylesheet
+                [ p
+                    [ withContainer [ minWidth (px 400) ]
+                        [ Css.Global.children [ Css.Global.a [ Css.color (hex "000000") ] ] ]
+                    ]
+                ]
+    in
+    -- Confirm selectors extend correctly inside a container rule (compaction path).
+    describe "selector extension inside withContainer"
+        [ test "extends selector under @container" <|
+            \_ ->
+                outdented (prettyPrint input)
+                    |> Expect.equal (outdented "@container (min-width: 400px){p > a{color:#000000;}}")
+        ]
+
+
+containerHashDistinct : Test
+containerHashDistinct =
+    let
+        render style =
+            prettyPrint (stylesheet [ p [ style ] ])
+
+        a =
+            render (withContainer [ minWidth (px 400) ] [ Css.color (hex "000000") ])
+
+        b =
+            render (withContainer [ minWidth (px 500) ] [ Css.color (hex "000000") ])
+    in
+    describe "container condition affects generated CSS (and thus class hash)"
+        [ test "different conditions produce different CSS text" <|
+            \_ -> Expect.notEqual a b
         ]
